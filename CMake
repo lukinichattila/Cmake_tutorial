@@ -1,0 +1,521 @@
+BAT file commands:
+                    - @set VARNAME=VALUE          sets the variable VARNAME to the VALUE (can be string, numbers,etc)
+                    - rd <absolute path> or rd<directory> -S -Q        - remove directory <absolute path> or rd <directory>     switches: -S Silent  -Q Confirm Yes
+                    - cd <directory>                              -changes current directory to <directory>
+                    - mkdir <directoryname> or%Variable%          - makes a directory in the current directory
+                    - @echo <whatever want to show with %VARIABLE%     %echo OFF  <- not show anything after in the bat file
+                    - if exist %DIRECTORY% (command..)else(command..)  - condition test
+                    - @set PRJDIR=%~dp0      <- current absolute path to wich the file that executed this command exists
+                    - @set /p varname=         <- waits for a result to be types on the keyboard
+                    - if '%varname%'=='2' goto <label>
+                     :label
+                      ..commands..
+                      goto endlabel
+                      :nextlabel
+                      ..commands..
+                      :endlabel
+                    - @call .\cmake_install_release.bat    <- calls an other *.bat file and returns to the bat file that is calling it
+CMAKE external command line option:
+      - in CMakeLists.txt:
+	    - option (MyOption "Myoption" OFF)
+	  - command line:
+	     cmake -DMyOption:BOOL=ON MyProjectfolder             <- -DMyOption must come before the path
+   variablenames are overridable with -DNAME=overridingvalue in the cmake command line
+The CMake build process consists on 2 stages: 1: configuration
+                                              2: generation
+   - During the configuration stage cmake configures the system by querying it(compiler exists, type of it, features it has)it also reads the CMakeList.txt files and
+     builds an internal representation of the entire project.
+   - The generation phase builds up the the project files
+   - after the generation phase cmake saves the CmakeCache.txt file in the build directory.Uses this file to save details so that it is rerun again it can reuse information
+     computed the first time and speed up the project generation.It also allows developer options to be saved between runs
+Cmake processes the CMakeLists.txt file
+- Build folder in the project folder needed where the build system will be put
+  in the build folder, Makefile and CmakeCache are important.the Makefile is important as it is needed to build the project.
+  with "cmake .. " from the build dir we can execute a build  command that will generate the build system
+        - cmake -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON -DVARIABLENAME:BOOL=OFF/ON -S%SOURCEDIR% -B%BINDIR%-G%PLATFORM%        <- -S - source directory
+          (in which the project exist -B where the binaries are compiled -G Platform to wich to build(like visual studio)
+       cmake --build <path> for windows and " make " for linux we can make the executables from the build system files
+       cmake --build . for windows we can make the executables from the build files
+       cmake -P CMakeLists.txt we can run a Cmake file in script mode
+       cmake --build <directory> --clean-first   <-cmake will clean the CmakeCache.txt file
+       cmake -G "Unix Makefiles" ../source   - if the g is omited, cmake will chose a default generator based on a host platform
+       cmake --build /pathtobuild --config Debug --target MyApp     --config specifies which configuration to build(- single config generators(like makefile)
+                                                                      will ignore the config option and rely on info provided when project generation step was performed
+                                                                    --target option can be used to tell the build tool what to build (if omited default build)
+- depending on what type of generators are needed  with cmake -g "generator type" you can chose(Ninja is very nice multi platform build tool)
+
+The CMakeList.txt files are composed by commands that help to build the project. It is the entry point of the cmake command.
+   It is the root of the build tree. It can only see the files that are in the same directory(it can see if there are with relative path).
+    - The CMake commands look like the folowing:
+             command1(arg_a1 arg_a2 arg_a3...)
+             command2(arg_b1 arg_b2 arg_b3...)
+             ...... etc
+    - They  can be split on multiple lines: command(arg1
+                                                    arg2)
+    - Command names are case insensitive add_executable=ADD_EXECUTABLE but it is recomended to use lowercase for commands
+
+!!! - There are 2 types of targets: executables and libraries (add_executable and add_library).With CMAKE we then link this targets.
+    - The first line that needs to be in a cmake file is the cmake_minimum_required(<version number>)
+cmake_minimum_required(<version number>) command: cmake_minimum_required(VERSION major.minor[.patch[.tweak]])
+        - every CmakeLists.txt file needs the minimum required cmake version declaration (VERSION must with uppercase)
+          ex. cmake_minimum_required(VERSION 3.17.0)
+
+project(projectName [VERSION major [.minor[.patch[.tweak]]]][Languages languagename]) command:(version 3.0 and up)(project(myproject VERSION 1.0.0)
+        - Projectname is required and may contain only letters, numbers, underscores).Spaces are not permitted!!!!
+        - Projectname is mandatory, rest is none (Version is used to mark the version of the progrma built for info)
+        - Languages can include: C, CXX,Fortran,ASM, Java(Default is C, CXX)
+        - if project is non language then it should be LANGUAGE NONE
+        - after the project command the linker and compiler checks are done and the config saved in CmakeCache.txt file
+          so that next time it will not run if there are no changes in config.Aditional checks may be in CMakeLists.txt files in subdirectorys
+
+Comments:
+        - comment lines have  a # in front and are till the end of line
+          #this is a comment
+
+add_executable(<executablename(target)> <Source Files>) command:
+        - this command is needed when at the end of the build process we want an executable file and the source files
+          are needed for this executable to come to life.first argument (executable name) is needed as the first argument,
+          the rest does not matter(source file list).The Source files list includes just the *.cpp files
+        - ex. add_executable(calculator main.cpp addition.cpp division.cpp)
+        - we can have multiple add_executables in a CMakeLists.txt file and for each a different executable file will be generated(with different name should be)
+        - we cant have 2 targets(executablename) with the same name!!!!
+        - a more option full version is:
+          add_executable(<executablename>[WIN32] [MACOSX_BUNDLE] [EXCLUDE FROM ALL] <Source Files>)
+                        - WIN32 option tells cmake to build a windows gui app(will be created with a WinMain() entry point instead of a main and it will be
+                          linked with .SUBSYSTEM:WINDOWS option.On all other platforms WIN32 option is ignored
+                        - MACOSX_BUNDLE
+                          when present, cmake will build an app bundle for Apple platform(macOS, iOS).CMAKE will geneerate Inflo.plist file for bundles
+                        - EXCLUDE_FROM_ALL option sometimes not all targets should be built.when no target is specified the ALL target is built
+		- every add_library, add_executable if it has an include file then must have an target_include_directory() atached to know where it should search for includefiles
+
+add_library(<library_name><STATIC|SHARED|MODULE> <EXCLUDE_FROM_ALL> <source_files><INTERFACE>) command:
+        - <libraryname> is the name of the library to which we want to add files.the library will be linked later to targets
+        - to make a hierarchy sensation we can group dependencies in libraries).we can name them upon their functionality
+          ex. add_library(my_math addition.cpp division.cpp)
+        - we can have more libraries in a project, each files added to different library. The main file can be with add_executable.
+        - STATIC libraries are archives of object files for use when linking other targets.On Win the filename would be targetname.lib or libtargetname.a on unix.
+		  STATIC means that the code will be copied into the executable when compiled.
+          SHARED libraries are linked dynamically and loaded at runtime. on Win it has the name targetname.dll, on apple libtargetname.dylib,on unix libtargetname.so.
+		  SHARED means the library code will not get copied into the executable however the library will need to be available at runtime
+          MODULE libraries are plugins that are not linked into other targets but may be loaded dynamically at runtime using dlopen-like functionality.
+          (STATIC, SHARED or MODULE) is OPTIONAL in the add library command
+        - If (STATIC, SHARED or MODULE) is not specified the library will be STATIC or SHARED.If BUILD_SHARED_LIBS variable is set to true, the library target will
+          be a SHARED library, otherwise it will be STATIC. This options can be made at command line also,like: cmake -DBUILD_SHARED_LIBS=YES /sourcepath
+          to enable: set(BUILD_SHARED_LIBS YES)
+        - if INTERFACE keyword is present it creates an interface library that does not compile sources and not producce a library on disk
+		- every add_library, add_executable if it has an include file then must have an target_include_directory() atached to know where it should search for includefiles
+
+add_library(<name> INTERFACE) - Creates an Interface Library(Header only - no sources allowed). An INTERFACE library target does not compile sources and does not produce a library artifact on disk.
+                               However, it may have properties set on it and it may be installed and exported. Typically, INTERFACE_* properties are populated on an
+                               interface target using the commands: set_property(),
+                                                                    target_link_libraries(INTERFACE),
+                                                                    target_link_options(INTERFACE),
+                                                                    target_include_directories(INTERFACE),
+                                                                    target_compile_options(INTERFACE),
+                                                                    target_compile_definitions(INTERFACE), and
+                                                                    target_sources(INTERFACE),
+!!!!!   - if we want the library to be IDE friendly, we can specify the source files with target_sources so headers which are not part of the executable target will be displayed in IDE's 
+
+target_sources(<target>  <INTERFACE|PUBLIC|PRIVATE> [items1...]  [<INTERFACE|PUBLIC|PRIVATE> [items2...] ...]) command 
+        - this command ads source files to a add_library or add_executable target.Enough to make add_library(target) and then add .cpp files with target sources)
+        - Repeated calls for the same <target> append items in the order called	
+        - PRIVATE and PUBLIC items will populate the SOURCES property of <target>, which are used when building the target itself. 
+		  PUBLIC and INTERFACE items will populate the INTERFACE_SOURCES property of <target>, which are used when building dependents.
+        - Relative source file paths are interpreted as being relative to the current source directory (i.e. CMAKE_CURRENT_SOURCE_DIR)		  
+		  
+target_compile_definitions("targetname" PUBLIC/PRIVATE/INTERFACE <item1> PUBLIC/PRIVATE/INTERFACE <item2>)
+        - passes flag definitions so that in the c or c++ program some can check for the flags and execute things (good for testing for example so that some lines will be included or not)
+		- "targetname" needed to be created with a command such as add_executable, add_library and must not be an alias
+		Ex. set(compile_definition_list MODULE_TEST
+		    target_compile_definitions(${Target_name} PUBLIC ${compile_defintion_list})
+			so in a *.c file we can execute some code if the compiler has these defintions:
+			#idef MODULE_TEST
+			  c+=0;
+			#else
+			 c=1;
+            #endif			 
+
+target_link_libraries(<target> <PRIVATE|PUBLIC|INTERFACE><lib1> <lib2>) command:
+        - to link the libraries with the target file(the file to which lib1 and lib2 have dependencys(target depends on lib1 and lib2)
+          we need to link them with the target_link_libraries command
+        - the exact names should be used that are in add_executable command and add_library command was used
+        - PUBLIC dependency is used when a library is needed not just by the direct upper dependency in the dependency chain, but directly by the
+          upper dependency of the dependency: a->b->c (everyone uses from c in the hierarchy.both header and source needs to include the dependency
+                                               \---/
+          ex. target_link_libraries(C PUBLIC B);target_link_libraries(A PUBLIC C)  <- A is top that depends on C, and C depends on B
+        - INTERFACE - the option/property does not impact the current target but will propagate to other targets that link to it.
+          INTERFACE is very usefull for header only libraries because  does not compile any file
+        - PRIVATE is used then the target will not propagate its dependencys up on the target chain
+          ex. target_link_libraries(calculator PRIVATE my_math my_print)
+        - A depends on B C D and C depends on D-> target_link_libraries(C PUBLIC D)/target_link_libraries(A PUBLIC B C)
+        - Every target has properties and dependencies associated with it.some properties include:
+          INTERFACE_LINK_DIRECTORIES;INCLUDE_DIRECTORIES; VERSiON; SOURCES;more at /cmake.org webpage/help
+          Properties can be modified with : set_target_properties(), set_property(), get_property(), get_target_property() functions
+          targets can have dependencyes one on another: Target A<-Target B. If B have dependency on A then B must be built succcesfully
+          first, then A
+
+In complex projects it makes sense to have the sourcefiles separate in folders.Sometimes there are 2 cmake folders: Debug and Release(which we make).
+           To add folders with *.cpp files in them we can add with add_subdirectory command to the CMakeLists.txt and then CMake will look for
+           another CMakeLists.txt file in them to execute
+
+add_subdirectory(<directoryname>)   <- just one directory at a time, for multiple directorys more add_subdirectory needed!!!!!!!!!!!!!
+             ex. add_subdirectory(Director1)
+           - if in a subdirectory there is another subdirectory without any files, the CMakeLists.txt file in this directory  will contain just add_sudirectory commands
+           - so the CMakeLists.txt file in the subdirectory will look like: add_library(lib <source files.cpp>)
+           - the CMakeLists.txt in the upper directory will look: add_subdirectory(<the subdirectory>), add_executable(calc main.cpp), target_link_libraries(calc lib)
+
+Header folder and cpp folder should be in the same folder with the CMakeLists.txt file, header files in /include subfolder, cpp files in /src subfolder.
+If the function definition from the header file will be different then in the cpp definition then error will ocur
+In the cpp files the first line should be #include"file.h" where file is the header file for the cpp file.when the header and the cpp file are in the same directory, the
+preprocessor will easily find that particular header file.If the header file is in a different folder then we must tell the preprocessor in which folder it is.
+if we want to resolve this in c++ file then we go up one level of directory then one down: #include "../include/addition.h"
+
+target_include_directories(<target> <scope> <dir1> <dir2>) command:    where scope (public, interface, private) ex. add_library(myprint src/printresult.cpp) /target_include_directories (myprint PUBLIC include)
+            - this is the command that ads header files to the build system
+            - if the target have dependency on the subfolders , and the targets target needs the files from the subfolder then scope will be PUBLIC
+			  declarations will be visible down the ierarhies and available to translation units that include the included files
+            - if the target have dependency on the subfolders , and the targets target does not need the files from the subfolder then scope will be PRIVATE
+			  declarations will not be visible down the ierarhies and not available to translation units that include the included files, even if the .h files are declared to be included in higher includes
+            - if the target does not have dependency on the subfolders , and the targets target needs the files from the subfolder then scope will be Interface
+            - for the ****.h header files in c++ to not have relative path, target_include directories needs to have the directorys in them and all the libraries that include the headers will need to link with target_link_libraries
+            - Headers and sources that you add to the project will be resolved correctly only if you include them explicitly in CMakeLists.txt or if you include them in other files already belonging to the project .
+            - target_include_directories(TargetA PRIVATE mydir) <- the INCLUDE_DIRECTORIES property of TargetA has mydir appended
+            - target_include_directories(TargetA INTERFACE mydir)   <- the INTERFACE_INCLUDE_DIRECTORIES property of TargetA is appends mydir
+			- every add_library, add_executable if it has an include file then must have an target_include_directory() atached to know where it should search for includefiles
+Other things we can set on targets:
+              target_link_libraries: Other targets; can also pass library names directly
+              target_include_directories: Include directories
+              target_compile_features: The compiler features you need activated, like cxx_std_11
+              target_compile_definitions: Definitions
+              target_compile_options: More general compile flags
+              target_link_directories: Don’t use, give full paths instead (CMake 3.13+)
+              target_link_options: General link flags
+              target_sources: Add source files(PIVATE and PUBLIC)will populate the SOURCES property of target, PUBLIC and INTERFACE will populate the INTERFACE_SOURCES property of target
+
+include_directories([AFTER|BEFORE][SYSTEM] dir1,dir2,..) command:
+            - Add the given direcories to the ones the compiler searches for include files.Dirs are relative to the current source directory
+            - include_directories() is accessible for all the files in the source-tree, target_include_directories() is-only accessible for a specific target when compile. 
+            - every add_library, add_executable if it has an include file then must have an target_include_directory() atached to know where it should search for includefiles			
+
+Interface libraries:
+
+message(<mode-of-display> "message") command:
+            - it prints a message to the console
+            - ex. message ("Hello World"),message (STATUS "Hello World"), message (DEBUG "Hello World"), message (WARNING "Hello World"), message (FATAL ERROR "Hello World")
+            - we can use variables also: ex. message(${NAME} ${LOCATION})
+
+set(<variable> <value> [[CACHE <type> <docstring> [FORCE]] | PARENT_SCOPE]) command:
+            - we can set a value for a variable by set(VARIABLENAME VALUE)
+            - if value has spaces, we need to enclose them in "", otherwise they are treated like lists with multiple items.ex. set (NAME "BOB Smith")
+            - all the variables in CMAKE are String types
+            - we can get the value in a variable as ${variablename}
+            - if we did not initialize a variable and we use it we will get an empty string
+            - variables defined in upper yerarchy CMakeLists.txt will be visible in lower folder CMakeLists.txt
+            - ex: set (NAME BOB)   message ("Hi, my name is ${NAME})
+            - if we want to append something to a variable with set we can use set(varname ${varname} "ittvan")
+!!!!!!      - if set variablename is with PARENT_SCOPE the variable will not be set in the current CMakeLists.txt files but in the CMakeLists.txt file that called the current
+			  and it is not propagating upwards.
+!!!!!!	    - if set variablename is not with PARENT_SCOPE the variable's value will be set in current CMakeLists.txt and the CMakeLists.txt that is under the current CMakeLists.txt and the one under,etc!!!!! 
+            - to overcome this variable propagation issue, the most downward CMakeLists.txt calls a file in a specific directory where all the assembly is happening:
+			  include(${PROJECT_SOURCE_DIR}/cmake/cmaketoexecutelast.cmake)              <- ${PROJECT_SOURCE_DIR} is the uppest level of directory
+              set(CMAKE_BUILD_TYPE Release)    <- used to set the build type to release
+			- If FORCE is specified, the value of the cache variable is set, even if the variable is already in the cache. This should normally be avoided, as it will remove any changes to the cache variable’s value by the user.
+			  
+file(GLOB <variable> "src/*.cpp") command:
+            - use of wildcards for file addition.we can add a list of files using wildcards.It will add all the files matching the wildcard from the specified directory:
+			- examples of expression *.cpp,*.vt? - all the files with extension vt that ends with anything,f[3-5].txt <-f3.txt,f4.txt,f5.txt
+file(GLOB_RECURSE <variable> pathandwildcard) command:
+            - same as GLOB just it will search recursively in the subdirectoryes
+
+Lists in CMake:
+            - " ", ; and "" are delimiting list elements
+            - if we initialize a variable with set (VAR aa bb cc), value of VAR is aa;bb;cc   message(${VAR}) aabbcc
+            - if we initialize a variable with set (VAR aa;bb;cc), value of VAR is aa;bb;cc   message(${VAR}) aabbcc
+            - if we initialize a variable with set (VAR "aa" "bb" "cc"), value of VAR is aa;bb;cc   message(${VAR}) aabbcc
+            - if we initialize a variable with set (VAR "aa bb cc"), value of VAR is aa bb cc, message(${VAR}) aa bb cc <- single variable, not a list
+            - if we initialize a variable with set (VAR "aa;bb;cc"), value of VAR is aa;bb;cc   message(${VAR}) aa;bb;cc
+            - if we want to get the value of a variable whos name is another variables value then: $($(Variable))   <- double dereferencing
+            - if we want to use the variable name inside " " we can use it   ex. message ("George is living in ${TOWN}")
+            - Beware the generator expression that looks similar: $<TARGET_FILE:library>
+
+list(<subcommand> <nameofthelist>...<returnvariable>) command:    where subcommand is APPEND, INSERT, FILTER, GET or JOIN and more are commands
+              ex. set (VAR 1 2 3 "ALI";7)
+                  list(APPEND VAR 8 9)    <- appends the 8 and 9 at the end of the list
+                  list(REMOVE_AT VAR 2 -3)   <- removes the elementsin pos 3 and 8 from the list (first element 0)
+                  list(REMOVE_ITEM VAR 1 3)     <- removes elements that have the value 1 and 3
+                  list(INSERT VAR 2 XX 10)      <- inserts at position 2 in the list elements xx and 10
+                  list(REVERSE VAR)             <- reverses the order of the list
+                  list(REMOVE_DUPLICATES)       <- removes duplicates from the list
+                  list(SORT VAR)                <- sorts the list in ascii order?
+                  list(LENGTH VAR len_var)      <- len_var=5 length of list
+                  list(GET VAR 0 2 4 newlist)    <- newlist=1;3;7 creates a newlist with the elements specified  in argument
+                  list(SUBLIST VAR 2 3 sub_list2)  <- sub_list2= creates a sub_list2 with 3 elements from VAR starting from position 2
+                  list(JOIN VAR ++ str_var)
+                  list(FIND VAR ALI find_var)    <- if find does not find anything it will return -1
+
+string() Command:   (FIND,REPLACE,PREPEND,APPEND,TOLOWER,TOUPPER,COMPARE)
+                  - operation on strings.
+                  string(FIND ${VAR} "for" findvar)   <- searches for the "for" string in the VAR variable and puts the position it finds it in the findvar variable.If not found it puts -1
+                  string(REPLACE "Projects" "Project" replacevariable ${VAR}) <- replaces the "Projects" with "Project" in the VAR variable and the result is put in the replacevariable variable
+                  string (PREPEND replacedvar "Master")  <- appends at the begining of the string contained in replacedvar the "Master" string
+                  string(APPEND replacedvar "Building")  <- appends to the end of the string contained in replacedvar the "building" stirng
+                  string(TOLOWER ${VAR} lowercasevar)   <- puts the lowercased string from VAR variable in the lowercasevar variable
+                  string(TOUPPER${VAR} uppercasevar)   <- puts the uppercased string from VAR variable  in the uppercasevar variable
+                  string(COMPAREEQUAL ${VAR} "HELLO" equalitycheckvar)  <- check if the VAR variable is equal with "HELLO" and the result is put in equalitycheckvar (1 if true)
+file() command:   (READ,WRITE,RENAME,REMOVE,COPY,DOWNLOAD, LOCK)
+
+if(<condition>) <command1> <command2> endif()  command:
+if(<condition>) <command1> elseif()(<condition> else()<condition> endif()
+                 - TRUE evaluates as ON,YES,TRUE,Y, non 0 number
+                 - FALSE evaluates as 0,OFF,NO,FALSE,N,IGNORE,NOTFOUND, empty string, string ending with -NOTFOUND, FALSE
+                 - using constants with if(): if(YES)...endif(), if(N)..endif(), if(ON)..endif(), if(OFF)..endif();
+                 - if we provide anything else then an (YES,etc) it will be treated like a variable ex. if(YES) <-> if(YE)  YE is a variable, YES is a constant
+                 - when we use the if() we dont need to put the variables in ${} because the if dereferences it for us ex. set(VAR YES) if(VAR) message("hertgr") else() message("sdfgf") endif()
+                 - if we use if with ${} then we test the condition of the variable  which is pointed to by the variable we test. ex. set (VAR OFF)  , set (VAR2 VAR) if(${VAR2})  -> VAR2 is OFF
+				 
+if(<condition>) Unary tests   (DEFINED, COMMAND, EXISTS) are used to check if something exists or not
+                 - DEFINED  is used to check if a variable is set or not. usualy it is used to see if a variable is set or not set
+                   ex. set (Name Alice) / if(DEFINED Name)/ message("Yoo")/ else () /message{"not yoo")
+                 - COMMAND is used to check if a command exists or not
+                   ex. if(COMMAND target_link_libraries)/message("target link library is a command")/else()/message("target link library is not a command")
+                 - EXISTS is used to checck if a file or directory exists or not
+                   ex. if(EXISTS /home/test/CMakeLists.txt)/message("file exists")/else()/message("does not exist)/endif()
+if(<condition>)  Binary tests used to compare 2 variables if there are equal , not equal, bigger, smaller, etc
+                 - STRLESS is used to check if a variable is less then an other variable(lexical compare upercase before lowercase)
+                   ex. set(Name1 Alice)/set(Name2 Bob)/if(Name1 STRLESS Name2) message("${Name1} is less then ${Name2}")
+                 - STRGREATER - is used to check if a variable is greater then an other variable(lexical compare upercase before lowercase)
+                   ex. set(Name1 Alice)/set(Name2 Bob)/if(Name1 STRGREATER Name2) message("${Name1} is greater then ${Name2}") /else().../endif()
+                 - STREQUAL is used to check if a variable is equal with an other variable(lexical compare upercase before lowercase)
+                   ex. set(Name1 Alice)/set(Name2 Bob)/if(Name1 STREQUAL Name2) message("${Name1} is equal with ${Name2}") /else().../endif()
+                Boolean operators (NOT AND OR) used to combine with the unary and binary test to form more complex conditions
+                 - ex. if(NOT DEFINED VAR) ; if(NOT(VAR STREQUAL "test" OR VARS2 STREQUAL "test2")); if(NOT(VAR STREQUAL "test" AND VAR2 STREQUAL "test2"))
+
+while (<condition>)/ <commands>/ endwhile() command:
+                 - in the condition part we dont dereference variables (no ${})
+                   ex. set (VAR a)/set (VAR ${VAR}a)   <- ads an a to a so VAR wil be aa
+                   ex. set (VAR a)/while(NOT VAR STREQUAL"aaaaaaaa")/set (VAR ${VAR}a)/message ("${VAR})/endwhile()
+                   ex. set(my_value 4)/while(my_value LESS 50)/message(STATUS"value is ${my_value})/endwhile()
+
+foreach(<loopvar><items>)/<commands>/endforeach() command: usualy it is used to iterate over a list of items or a range of numbers
+                   ex. foreach(Name Alica Bob Charlie)/message(${Name})/endforeach()  <- Name will be each of the names respectively
+                   ex. foreach(Name Alica;Bob;Charlie)  <- same
+                   ex. foreach(x RANGE 10)  <- x takes values from 0 to 10
+                   ex. foreacch(x Range 10 20)   <- x takes values from 10 to 20
+                   ex. foreach(x RANGE 10 20 3)   <- x takes values from 10 to 20 with step 3   start, stop and step values needs to be positive!!
+                   ex. foreach(x IN LISTS <list1> <list2> <list3>) endforeach()   is used to iterate over a list of lists
+                   ex. set(VAR 0;1)/set (VAR2 6 7)/set(VAR3 "erter")/foreach(x IN LISTS VAR VAR2 VAR3)/message("x=${x}")/endforeach()
+
+continue()         - continue is used to jump to the next foreach or while loop iteration, skipping the rest of the code until endforeach() or endwhile()
+
+break()            = break is used to break out of a forreach or while loop
+
+function(<functionname> <function args>)/commands.../endfunction() command:
+                   ex. function(printdetail name_var)/message("Nice day ${name_var}!")/endfunction()
+                       set (Name Charlie)/printdetail(${Name})             <- prints Charlie
+                 - in CMake functions do not return values.any global variable they use and modifie remain inside the functions scope and not affect global scope!!!
+                 - to modify a variable outside the scope of the function PARENT_SCOPE is used
+                   ex. set(Name Bob PARENT_SCOPE)
+                 - when calling the function, variables need to be dereferenced with ${} to pass the value, otherwise they will pass like strings
+                 - if we pass the arguments without the ${}, in the function we need to derefrence twice to get to the value ex. printdetail(Name)... message("Nice day ${${name}})
+                 - we can use twice the same function name definition in a script.Cmake will execute the second.we can specify to execcute the first with _functionname
+                   ex. function(printdetail name_var)/message("Nice day ${name_var}!")/endfunction()
+                       set (Name Charlie)/_printdetail(${Name})
+                 - functions can have optional arguments beside the mandatory ones.these can be checked with keyword ARGV1 in an if if exists:
+                   ex. function(printdetail name_var)/message("Nice day ${name_var}!")/if(DEFINED ARGV1)/ message("yuhuu"/endif()/endfunction()
+                       set (Name Charlie)/printdetail(${Name} Bob)
+                 The folowing special variables can be used with functions:
+                 - ARGC - total count of arguments(named + optional)
+                 - ARGV - list of all arguments (named+optional)
+                 - ARGN - List of optional arguments
+                 - ARGV0 - First argument
+                 - ARGV1 - second argument
+                 - ARGV2 - Third argument
+                   ex: function(printdetail namevar)
+                               message("My name is ${${namevar}}")
+                               message("ARGC="${ARGC}")
+                               message("ARGV="${ARGV}")
+                               message("ARGN="${ARGN}")
+                               if(DEFINED ARGV0)
+                                   message("ARGV0" ${ARGV0})
+                                   endif()
+                               if(DEFINED ARGV1)
+                                   message("ARGV1" ${ARGV1})
+                                   endif()
+                               if(DEFINED ARGV2)
+                                   message("ARGV2" ${ARGV2})
+                                   endif()
+                               endfunction()
+
+variable_watch(My_VAR)  - we can watch variables with this command.it should be set at the top of the CMAKElist
+Variable Scopes           - a variable created or modified inside a function is not accesible outside the function
+                 - in CMake functions do not return values.any global variable they use and modifie remain inside the functions scope and not affect global scope!!!
+                 - to modify a variable outside the scope of the function PARENT_SCOPE is used
+                   ex. set(Name Bob PARENT_SCOPE)
+!!!              - add_subdirectory command makes the CMakeLists.txt files code that are in the subdirectory act similarly like a function meaning variables modified inside CMakeLists.txt are local
+                   to modify a variable inside a subdirectory CMakeLists.txt  we need to use the PARENT_SCOPE argument
+
+macro(<function_name><function_args>)/commands../endmacro() command:
+                 - macros are like functions, except unlike function they are not working on local scope, they are working on global scope.They do not introduce a new scope
+                 - arguments in macros are there for the string replacements( cmake replaces the value  of the variables with the one form the parrent scope
+                 - macros do not use local scope.Commands written in the macro body are afecting the PARENT_SCOPE variables
+                 ex. macro(print namevar)/message("My name is ${namevar})/set(namevar abc)/message("My name is${namevar})/endmacro()  <- set namevar abc introduces a new variable in the maro scope however it will not be used
+                     as it has the same name as the parent scope variable that will be used instead
+
+include(mymodule) command: modules :
+                - apart from the CMakeFiles.txt, CMake codes are written in modules.the CMake modules have .cmake extension
+                - modules can be used with the include() command
+                - a module file can be mymodule.cmake
+                ex. content of CMakeLists.txt file cmake_minimum_requires(VERSION 3.0.0)/project(Calculator VERSION 1.0.0)/list(APPEND CMAKE_MODULE_PATH <path to module>/include(my_module)
+                    APPEND CMAKE_MODULE_PATH is a cache variable which contain the list of paths  to search modules
+                    content of mymodule.cmake : message ("Yuhuu!")
+                    running from the build directory cmake .. wil output Yuhuu!
+                    the modules.cmake files do not introduce new scopes, meaning theey are just like parts of the CMakeLists.txt file.they are used for reusable code purposes or if CMakeLists.txt is too long
+                    and we want to improve the readability of our code-
+CMAKE Variables:
+                - PROJECT_NAME - Name of the project given to the project command
+                - CMAKE_PROJECT_NAME - The name of the top level project.This variable holds the name of the project as specified in the top level CMakeLists.txt file by a project() command.It ends with a "/"
+                - PROJECT_SOURCE_DIR - This is the source directory of the last call to the project() command made in the current directory scope or one of its parents.It ends with a "/"
+                - CMAKE_CURRENT_SOURCE_DIR - The path to the source directory currently being processed.It ends with a "/"
+                - CMAKE_SOURCE_DIR - This is the full path to the top level of the current CMake source tree.It ends with a "/"
+                - CMAKE_BINARY_DIR - This is the full path to the top level of the current CMake build tree.It ends with a "/"
+                - CMAKE_CURRENT_BINARY_DIR - This the full path to the build directory that is currently being processed by cmake. Each directory added by add_subdirectory() will create a
+                  binary directory in the build tree, and as it is being processed this variable will be set.It ends with a "/"
+                - CMAKE_CURRENT_LIST_DIR: The folder that contains currently processed CMakeLists.txt file
+Global Scope Variables (Cache Variables) -
+                - Global variables are 2 types: - Persistent Cache Variables
+                                                - Environment Variables
+ !!             - Environment variables have global scope, they propagate through cmakelists files
+                  ex. set(ENV{varname} "test")        to retrive value: $ENV{varname}
+                - Cache variables are stored in CMakeCache.txt file(over 100)
+                - usually Cache variables are set by CMake, and are dependent on Development environment
+                - it can be set by commands inside CMakeLists.txt
+                  ex. CMAKE_CXX_COMPILER path is set, CMAkE_PROJECT_NAME is set, etc
+                - Cache variables can be set with the set command in CMakeLists.txt
+                  ex. set (A "1  2 3" CACHE STRING "This sets the A variable to be global (CACHE)") , it is STRING type and the description is "This sets..".It will write the A
+                  variable with value "1 2 3" in the CMakeCache.txt file
+                  if we want to use a cache variable we must use it with $CACHE{<variable>}. ex. message ("the a variable has $CACHE{A} value")
+                - once a cache variable is written in CMakeCache.txt, cannot be written second time.3 options available for modifications:
+                               - edit CMakeCache.txt manualy
+                               - Use the set (<variable name> <listorvar>CACHE STRING "description" FORCE) command   (not recomended)
+                               - use the -D flag cmake -DName=Charlie ..    <- overwrites the Name variable in CMakeCache.txt
+                - environment variables are also global, but they are not stored in CMakeCache.txt file
+                - to set an environment variable: set (ENV <variable_name> <variable_value>)
+                - to dereference an Environment variable we use $ENV{variable_name}
+                - there are more then 500 CACHE Variable
+
+CMake CACHE Variables:
+                - CMAKE_VERSION     3.21.1
+                - CMAKE_MAJOR_VERSION   3
+                - CMAKE_MINOR_VERSION   21
+                - CMAKE_PATCH_VERSION   1 <- this 3 contain the CMAKE version subpart versions
+                  ex: message(CMAKE_MAJOR_VERSION=${CMAKE_MAJOR_VERSION})
+                - CMAKE_PROJECT_NAME <- it is the name set with the project(<Projname> VERSION 1.0.0) commandin the CMakeLists.txt files
+                - PROJECT_NAME <- it is the name set with the the project(<Projname> VERSION 1.0.0) commandin the CMakeLists.txt files but without the VERSION 1.0.0
+                  every folder can have a different Project name in the CMakeLists.txt file
+                - CMAKE_GENERATOR - tells CMAKE about the build sistem - make build system (CMAKE_GENERATOR:INTERNAL=UNIX makefiles
+                  cmake --help can show us all the options for the generator.To set a different  generator: cmake -DCMAKE_GENERATOR=Ninja ..
+				Ex. cmake -G "MinGW Makefiles"      <- executed on the shell line sets the generator files to mingw makefiles or cmake -DCMAKE_GENERATOR="MinGW Makefiles"
+
+External Libraries - libraries are part of packages that consists of multiple source files.
+                   - Packages need to be downloaded,compiled and installed
+                   - suporting files,header files  are put into predefined folders
+                   - to use the installed package in our program we need to write some commands in the CMakeLists.txt
+
+install(FILES <file_name> DESTINATION <dir>)
+install(TARGETS <target_name's> DESTINATION <dir>) command: (the default location in linux where to install them is /usr/local)
+                - instalation of package files means copying by cmake the files to their destination folders from a sourcefolder
+                  ex. install (FILES ${CMAKE_CURRENT_SOURCE_DIR} /include/abc.h ${CMAKE_CURRENT_SOURCE_DIR /include/division.h DESTINATION ${CMAKE_INSTALL_PREFIX} /include/mymath)
+                  ex. install (TARGETS mymath DESTINATION ${CMAKE_INSTALL_PREFIX} /lib/mymath)
+                  ex. add_library(libone libone.c)
+                      add_executable(one main1.c)
+                      install(TARGET libone one DESTINATION /somedir COMPONENT compone)
+                      add_library(libtwo libtwo.c)
+                      add_executable(two main2.c)
+                      install(TARGET libtwo two DESTINATION /somedir COMPONENT comptwo)   <- if we run cmake -DCOMPONENT=compone -P /buildir/cmake_install.cmake will install
+                                                                                             library libone and one executable.without -DCOMPONENT will install all
+				ex. install (TARGETS mylib COMPONENT TARGET_COMPONENT DESTINATION usr/lib INCLUDES DESTINATION usr/include)  <- install target mylib for component TARGET_COMPONENT to 
+				    destination directory usr/lib assigning it with separately installed include files in destination directory usr/include
+				ex. INSTALL(TARGETS mylib LIBRARY DESTINATION some/libpath PUBLIC_HEADER DESTINATION some/includepath) installs target mylib into some/libpath and the headers will be installed in some/includepath
+				- setting an install path where the files should be installed:
+				ex. if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+                    set(CMAKE_INSTALL_PREFIX "/my/default" CACHE PATH "..." FORCE)
+                    endif()
+
+find_package (<package_name>) command:
+                - when this command is executed, CMake searches for the ABC_config.cmake file in the /usr/local/lib/ABC
+                - in order for this command to work, we need to create this file in the specified folder
+                  ex. find_package(ABC)
+                - to export the package the folowing code should be written in CMakeLists.txt
+                  ex. add_library (mymath src.addition.cpp src/division.cpp)
+                      target_include_directories(mymath PUBLIC include)
+                      $<INSTALL_INTERFACE:include>
+                      $BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                      install (FILES ${CMAKE_CURRENT_SOURCE_DIR} /include/abc.h ${CMAKE_CURRENT_SOURCE_DIR /include/division.h DESTINATION ${CMAKE_INSTALL_PREFIX} /include/mymath)
+                      install(TARGETS mymath EXPORT myexport DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/mymath)
+                      install(EXPORT myexport FILE mymath-config.cmake DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/mymath)
+
+using third party package in our project:It will work in 2 modes: Module mode and Config mode
+                - Module mode: Findmy_math.cmake    ex. find_package(my_math MODULE)
+                - Config mode: mymath-config.cmake  ex. find_package(my_math CONFIG)
+                - if not option(module,config) is specified the cmake will search in module mode and then in config mode
+                - the differencce between this 2 modules is that in module mode , cmake will look for the packages in the *CMAKE_MODULE_PATH directory in CMakeCache.txt file
+                  in config mode is often used when using an install package.
+                  ex. find_package(my_math)
+                      if(my_math FOUND)
+                          message("Library found")
+                          add_executable(calc main.cpp)
+                          target_link_libraries(calc mymath)
+                      else()
+                          message(FATAL_ERROR "my_math not found")
+                      endif()
+
+# comments:     - with # we can have a single line comment
+                - with #[[   #]] we can have multi line comments
+Using CMake variables in cpp files:
+                - to use CMAKE variables or cache variables in aa cpp file we need to add the variable definition in CMAKE
+                  ex. add_definitions(-Dsomevariablename=${CMAKE_SOURCE_DIR}")
+                - we can use this variables in a cpp files like:
+                  ex. std::cout<<somevariablename<<"\n";
+                  or:
+                  #ifdef somevariablename
+                         dosomething()
+                  #endif
+
+Debug/Release Mode -  How can we handle different build configurations like debug, release etc. using CMakeLists.txt file?
+                  There are these 2 case scenarios:
+                  1. You are making a project, which does not dependent on any external library. In this case, you can directly
+                     set a normal variable CMAKE_BUILD_TYPE to Debug or Release, while generating build system files. To do that, simply execute
+                      cmake -DCMAKE_BUILD_TYPE=Debug .. or
+                      cmake -DCMAKE_BUILD_TYPE=Release .. commands.
+                      You will see that the release build is faster and also has less file size compared to the debug build. When you
+                      set the CMAKE_BUILD_TYPE variable, the compiler flags are automatically modified to offer you the desired
+                      optimization levels.
+                  2. You want to use an external library in the Debug/Release mode.
+                     2a. Firstly, you will download the external library's source codes and compile it in both debug and release modes.
+                         You MUST have separate folders containing the debug binaries and release binaries. Say the external debug library is in /some/path/foo/debug/libfoo.so and the release library is in /some/path/foo/release/libfoo.so .
+                  2b.Say, the executable in your project is called my_app then you can use the following command in my_app project's CMakeLists.txt file, to link the external foo liibrary.
+                     target_link_libraries( my_app debug/some/path/foo/debug/libfoo.so)
+                     optimized  /some/path/foo/release/libfoo.so)
+                     Now, when you will run
+                        cmake -DCMAKE_BUILD_TYPE=Debug ..
+                     while generating the build files for my_app project ,  /some/path/foo/debug/libfoo.so will be linked against my_app.
+                     Similarly, when you will run
+                     cmake -DCMAKE_BUILD_TYPE=Release ..
+                      /some/path/foo/release/libfoo.so will be linked against my_app.
+                      Note here that, running the cmake.. command i.e. without any build type will throw an error.
+
+
+Using External librarys - if the library is XYZ, and the library files name is libXYZ.a or libXYZ.so we can download the source files from github,
+                          we should find a XYZ-config.cmake file, and then we can use fing_package(XYZ) command in CMakefiles.txt
+                        - if we dont find the cmake file, contact developer or write your own Find*cmake file or write *config module
+                        - XYZconfig.cmake is kept inside the standard Dir locations(/usr/local),FindXYZmodule inside our project
+                        - if the library use Make based build generation process then *config.cmake can be or not present
+                        - if the library uses NON-Cmake based build generation process CMake or library provides Find * or config * modules
+                        - uses pkg-config file. if there is no one then we can write our own find modules
+Using external libraries using CMake based build generation proces(*config.cmake and .config files are present)
+                       ex. Installing OPEN CV
+                        cmake_minimum_required(VERSION 3.0.0)
+                        project(DisplayImage)
+                        find_package(OpenCV REQUIRED)     <- the cmake will look for the OpenCVConfig.cmake file.if find_package(opencv REQUIRED) command then it will look for opencvConfig.config with lowercase
+                        Package Name: XYZ   -> Libraries: XY_LIBRARIES, XYZ_LIBS,, include directories: XYZ_INCLUDES, XY_INCLUDE_DIRS
+
